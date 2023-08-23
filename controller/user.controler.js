@@ -1309,6 +1309,81 @@ module.exports.sendPdfListe = async_handler(async (req, res) => {
   }
 });
 
+// module.exports.sendPdfListeMember = async_handler(async (req, res) => {
+//   try {
+//     const users = await User.find(
+//       {},
+//       "names partition instrument identification isSuperAdmin"
+//     );
+
+//     // Filtrer les utilisateurs par propriété isSuperAdmin et isMember
+//     const filteredUsers = users.filter(
+//       (membre) => membre.isSuperAdmin === false || membre.isMember === true
+//     );
+
+//     // Trier les utilisateurs par ordre alphabétique des noms (proprieté 'names')
+//     const sortedUsers = filteredUsers.sort((a, b) =>
+//       a.names.localeCompare(b.names)
+//     );
+
+//     // Créer un tableau HTML pour afficher tous les utilisateurs triés par ordre alphabétique des noms
+//     let tableHTML = `
+//       <table style=" font-family: Arial, sans-serif; width: 210mm; border-collapse: collapse;">
+//         <thead>
+//           <tr style="background-color: #ECECEC; border-bottom: 1px solid #CCCCCC; text-align: center;">
+//             <th style="padding: 2px; border: 1px solid #CCCCCC;">Nom complet</th>
+//             <th style="padding: 2px; border: 1px solid #CCCCCC;">Partition</th>
+//             <th style="padding: 2px; border: 1px solid #CCCCCC;">Instrument</th>
+//             <th style="padding: 2px; border: 1px solid #CCCCCC;">Code d'id</th>
+//           </tr>
+//         </thead>
+//         <tbody>
+//     `;
+
+//     sortedUsers.forEach((user) => {
+//       tableHTML += `
+//         <tbody>
+//           <tr style="border-bottom: 1px solid #CCCCCC;">
+//             <td style="padding: 2px; border: 1px solid #CCCCCC;">${user.names}</td>
+//             <td style="padding: 2px; border: 1px solid #CCCCCC;">${user.partition}</td>
+//             <td style="padding: 2px; border: 1px solid #CCCCCC;">${user.instrument}</td>
+//             <td style="padding: 2px; border: 1px solid #CCCCCC;">${user.identification}</td>
+//           </tr>
+//         </tbody>
+//       `;
+//     });
+
+//     tableHTML += `
+//       </tbody>
+//     </table>
+//   `;
+
+//     let user;
+//     user = await User.findOne({ _id: req.params.id });
+//     if (!user)
+//       return res.status(401).json({
+//         message: `Vous n'êtes pas sûrement un administrateur`,
+//       });
+//     const mailOptions = {
+//       from: `La Grâce Parle <${process.env.USER}>`,
+//       to: user.email,
+//       subject: "Liste des éléments de la PhilHarmonie La Grâce Parle",
+//       html: tableHTML, // Ajouter le tableau HTML contenant tous les utilisateurs avec leurs prénoms, noms, heures et statuts dans le corps du message
+//     };
+
+//     transporter.sendMail(mailOptions, (error) => {
+//       if (error) {
+//         return res.status(500).json({ message: error });
+//       } else {
+//         res.json({
+//           message: "La liste des membres a été envoyé avec succès.",
+//         });
+//       }
+//     });
+//   } catch (error) {
+//     return res.status(500).json({ message: error });
+//   }
+// });
 module.exports.sendPdfListeMember = async_handler(async (req, res) => {
   try {
     const users = await User.find(
@@ -1326,18 +1401,6 @@ module.exports.sendPdfListeMember = async_handler(async (req, res) => {
       a.names.localeCompare(b.names)
     );
 
-    // Créer un objet pour regrouper les utilisateurs par instrument
-    const groupedUsersByInstrument = {};
-    sortedUsers.forEach((user) => {
-      const instrument = user.instrument;
-
-      if (!groupedUsersByInstrument[instrument]) {
-        groupedUsersByInstrument[instrument] = [];
-      }
-
-      groupedUsersByInstrument[instrument].push(user);
-    });
-
     // Créer un tableau HTML pour afficher tous les utilisateurs triés par ordre alphabétique des noms
     let tableHTML = `
       <table style=" font-family: Arial, sans-serif; width: 210mm; border-collapse: collapse;">
@@ -1352,24 +1415,25 @@ module.exports.sendPdfListeMember = async_handler(async (req, res) => {
         <tbody>
     `;
 
-    // Ajout de paragraphes pour les utilisateurs ayant le même instrument
-    for (const instrument in groupedUsersByInstrument) {
-      tableHTML += `<tr><td colspan="4"><p><strong>Utilisateurs avec l'instrument ${instrument} :</strong> `;
-      groupedUsersByInstrument[instrument].forEach((user, index) => {
-        if (index > 0) {
-          tableHTML += ", ";
-        }
-        tableHTML += user.names;
-      });
-      tableHTML += `</p></td></tr>`;
-    }
+    sortedUsers.forEach((user) => {
+      tableHTML += `
+        <tbody>
+          <tr style="border-bottom: 1px solid #CCCCCC;">
+            <td style="padding: 2px; border: 1px solid #CCCCCC;">${user.names}</td>
+            <td style="padding: 2px; border: 1px solid #CCCCCC;">${user.partition}</td>
+            <td style="padding: 2px; border: 1px solid #CCCCCC;">${user.instrument}</td>
+            <td style="padding: 2px; border: 1px solid #CCCCCC;">${user.identification}</td>
+          </tr>
+        </tbody>
+      `;
+    });
 
-    // Fermeture du tableau HTML
     tableHTML += `
       </tbody>
     </table>
   `;
 
+    // ... (le reste du code reste inchangé) ...
     let user;
     user = await User.findOne({ _id: req.params.id });
     if (!user)
@@ -1382,6 +1446,31 @@ module.exports.sendPdfListeMember = async_handler(async (req, res) => {
       subject: "Liste des éléments de la PhilHarmonie La Grâce Parle",
       html: tableHTML, // Ajouter le tableau HTML contenant tous les utilisateurs avec leurs prénoms, noms, heures et statuts dans le corps du message
     };
+
+    // Compter le nombre d'effectifs par instrument
+    const instrumentCounts = {};
+    sortedUsers.forEach((user) => {
+      const instrument = user.instrument;
+
+      if (!instrumentCounts[instrument]) {
+        instrumentCounts[instrument] = 0;
+      }
+
+      instrumentCounts[instrument]++;
+    });
+
+    // Créer le paragraphe avec les nombres d'effectifs par instrument
+    let instrumentCountsParagraph = `<p>Effectif par instrument : `;
+    for (const instrument in instrumentCounts) {
+      instrumentCountsParagraph += `${instrument} - ${instrumentCounts[instrument]} membres, `;
+    }
+    instrumentCountsParagraph = instrumentCountsParagraph.slice(0, -2); // Supprimer la virgule et l'espace en trop
+    instrumentCountsParagraph += `.</p>`;
+
+    // Ajouter le paragraphe au contenu HTML du message
+    tableHTML += instrumentCountsParagraph;
+
+    // ... (le reste du code reste inchangé) ...
 
     // Envoyer l'e-mail avec le contenu HTML mis à jour
     transporter.sendMail(mailOptions, (error) => {
